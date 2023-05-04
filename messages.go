@@ -5,3 +5,9 @@ type SessionMessage struct {
 	X          float32 `json:"x"`
 	Y          float32 `json:"y"`
 }
+
+type MovementMessage struct {
+	PlayerName string  `json:"playerName"`
+	X          float32 `json:"x"`
+	Y          float32 `json:"y"`
+}

@@ -1,12 +1,15 @@
 package main
 
+import "sync"
+
 type Player struct {
 	PlayerName string  `json:"playerName"`
 	X          float32 `json:"x"`
 	Y          float32 `json:"y"`
 }
 
-var roomPlayers map[string]Player = make(map[string]Player)
+var roomPlayersLock = sync.Mutex{}
+var roomPlayers = make(map[string]Player)
 
 func mapToList(mp map[string]Player) []Player {
 	var lp []Player = []Player{}
@@ -15,4 +18,19 @@ func mapToList(mp map[string]Player) []Player {
 	}
 
 	return lp
+}
+
+func updatePlayerPosition(player Player) {
+	roomPlayersLock.Lock()
+	rp, ok := roomPlayers[player.PlayerName]
+	if !ok {
+		return
+	}
+
+	rp.X = player.X
+	rp.Y = player.Y
+
+	roomPlayers[player.PlayerName] = rp
+
+	roomPlayersLock.Unlock()
 }

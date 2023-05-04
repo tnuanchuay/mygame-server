@@ -9,7 +9,6 @@ import (
 
 func main() {
 	app := fiber.New()
-
 	app.Use("/ws", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
 			c.Locals("allowed", true)
@@ -19,14 +18,57 @@ func main() {
 		return fiber.ErrUpgradeRequired
 	})
 
+	app.Get("/ws/player/:name", websocket.New(func(conn *websocket.Conn) {
+		defer conn.Close()
+
+		name := conn.Params("name")
+
+		for {
+			<-time.After(10 * time.Millisecond)
+
+			p, ok := roomPlayers[name]
+			if !ok {
+				return
+			}
+
+			conn.WriteJSON(p)
+		}
+	}))
+
+	app.Get("/ws/move", websocket.New(func(conn *websocket.Conn) {
+		defer conn.Close()
+		for {
+			var msg MovementMessage
+			err := conn.ReadJSON(&msg)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			p := Player{
+				msg.PlayerName,
+				msg.X,
+				msg.Y,
+			}
+
+			updatePlayerPosition(p)
+			fmt.Println(p.PlayerName, "is moving")
+		}
+	}))
+
 	app.Get("/ws/players", websocket.New(func(conn *websocket.Conn) {
+		defer conn.Close()
+
+		conn.WriteJSON(mapToList(roomPlayers))
 		for {
 			conn.WriteJSON(mapToList(roomPlayers))
-			<-time.After(1 * time.Millisecond)
+			<-time.After(1000 * time.Millisecond)
 		}
 	}))
 
 	app.Get("/ws/session", websocket.New(func(conn *websocket.Conn) {
+		defer conn.Close()
+
 		playerName := ""
 		for {
 			var msg SessionMessage
