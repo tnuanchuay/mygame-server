@@ -24,7 +24,7 @@ func main() {
 		name := conn.Params("name")
 
 		for {
-			<-time.After(10 * time.Millisecond)
+			<-time.After(20 * time.Millisecond)
 
 			p, ok := roomPlayers[name]
 			if !ok {
@@ -52,7 +52,7 @@ func main() {
 			}
 
 			updatePlayerPosition(p)
-			fmt.Println(p.PlayerName, "is moving")
+			fmt.Println(p.PlayerName, "is moving to", p.X, p.Y)
 		}
 	}))
 
