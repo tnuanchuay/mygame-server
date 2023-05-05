@@ -25,6 +25,7 @@ func PlayerSession(conn *websocket.Conn) {
 			PlayerName: msg.PlayerName,
 			X:          msg.X,
 			Y:          msg.Y,
+			ModelId:    msg.ModelId,
 		}
 
 		log.Println(msg.PlayerName, "has joined the room")
@@ -42,7 +43,7 @@ func GetRoomPlayer(conn *websocket.Conn) {
 	}
 }
 
-func GetPlayerMovementWSHandler(playerMovement chan<- Player) func(conn *websocket.Conn) {
+func GetPlayerMovementWSHandler(playerMovement chan<- PlayerMovement) func(conn *websocket.Conn) {
 	return func(conn *websocket.Conn) {
 		defer conn.Close()
 		for {
@@ -53,19 +54,23 @@ func GetPlayerMovementWSHandler(playerMovement chan<- Player) func(conn *websock
 				return
 			}
 
-			p := Player{
+			p := PlayerMovement{
 				msg.PlayerName,
 				msg.X,
 				msg.Y,
 			}
-			playerMovement <- p
+
+			for i := 0; i < getTotalNumberPlayerInTheRoom()-1; i++ {
+				playerMovement <- p
+			}
+
 			updatePlayerPosition(p)
 			log.Println(p.PlayerName, "is moving to", p.X, p.Y)
 		}
 	}
 }
 
-func GetPlayerDataByPlayerIdWSHandler(playerMovement chan Player) func(conn *websocket.Conn) {
+func GetPlayerDataByPlayerIdWSHandler(playerMovement chan PlayerMovement) func(conn *websocket.Conn) {
 
 	return func(conn *websocket.Conn) {
 		defer conn.Close()
@@ -73,13 +78,13 @@ func GetPlayerDataByPlayerIdWSHandler(playerMovement chan Player) func(conn *web
 		name := conn.Params("name")
 
 		for {
-			p := <-playerMovement
-			if p.PlayerName != name {
-				playerMovement <- p
+			pm := <-playerMovement
+			if pm.PlayerName != name {
+				playerMovement <- pm
 				continue
 			}
 
-			p, ok := roomPlayers[p.PlayerName]
+			p, ok := roomPlayers[pm.PlayerName]
 			if !ok {
 				return
 			}
