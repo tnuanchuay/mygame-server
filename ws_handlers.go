@@ -1,9 +1,12 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
 	"github.com/gofiber/websocket/v2"
 	log "github.com/sirupsen/logrus"
+	"mygame-server/internal/game_static"
+	"mygame-server/internal/pubsub"
+	"mygame-server/internal/room"
 	"time"
 )
 
@@ -16,17 +19,19 @@ func PlayerSession(conn *websocket.Conn) {
 		err := conn.ReadJSON(&msg)
 		if err != nil {
 			log.Println(playerName, "has left the room")
-			delete(roomPlayers, playerName)
+			room.DeletePlayerByName(playerName)
 			return
 		}
 
 		playerName = msg.PlayerName
-		roomPlayers[msg.PlayerName] = Player{
+		p := room.Player{
 			PlayerName: msg.PlayerName,
 			X:          msg.X,
 			Y:          msg.Y,
 			ModelId:    msg.ModelId,
 		}
+
+		room.AddPlayer(p)
 
 		log.Println(msg.PlayerName, "has joined the room")
 		conn.WriteJSON("ok")
@@ -36,60 +41,63 @@ func PlayerSession(conn *websocket.Conn) {
 func GetRoomPlayer(conn *websocket.Conn) {
 	defer conn.Close()
 
-	conn.WriteJSON(mapToList(roomPlayers))
+	conn.WriteJSON(room.GetPlayerList())
 	for {
-		conn.WriteJSON(mapToList(roomPlayers))
+		conn.WriteJSON(room.GetPlayerList())
 		<-time.After(1000 * time.Millisecond)
 	}
 }
 
-func GetPlayerMovementWSHandler(playerMovement chan<- PlayerMovement) func(conn *websocket.Conn) {
-	return func(conn *websocket.Conn) {
-		defer conn.Close()
-		for {
-			var msg MovementMessage
-			err := conn.ReadJSON(&msg)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
+func PlayerMovementHandler(conn *websocket.Conn) {
+	defer conn.Close()
 
-			p := PlayerMovement{
-				msg.PlayerName,
-				msg.X,
-				msg.Y,
-			}
-
-			for i := 0; i < getTotalNumberPlayerInTheRoom()-1; i++ {
-				playerMovement <- p
-			}
-
-			updatePlayerPosition(p)
-			log.Println(p.PlayerName, "is moving to", p.X, p.Y)
+	for {
+		var msg MovementMessage
+		err := conn.ReadJSON(&msg)
+		if err != nil {
+			log.Errorln(err)
+			return
 		}
+
+		pm := room.PlayerMovement{
+			PlayerName: msg.PlayerName,
+			X:          msg.X,
+			Y:          msg.Y,
+		}
+
+		room.UpdatePlayerPosition(pm)
+
+		err = pubsub.PublishInterface(game_static.TopicPlayerMove(pm.PlayerName), pm)
+		if err != nil {
+			log.Errorln(err)
+		}
+
+		log.Println(pm.PlayerName, "is moving to", pm.X, pm.Y)
 	}
+
 }
 
-func GetPlayerDataByPlayerIdWSHandler(playerMovement chan PlayerMovement) func(conn *websocket.Conn) {
+func ListenPlayerMovement(conn *websocket.Conn) {
+	defer conn.Close()
 
-	return func(conn *websocket.Conn) {
-		defer conn.Close()
+	name := conn.Params("name")
+	if name == "" {
+		return
+	}
 
-		name := conn.Params("name")
+	playerMovementChan := pubsub.Subscribe(game_static.TopicPlayerMove(name))
 
-		for {
-			pm := <-playerMovement
-			if pm.PlayerName != name {
-				playerMovement <- pm
-				continue
-			}
+	for {
+		msg := <-playerMovementChan
+		var pm room.PlayerMovement
+		err := json.Unmarshal(msg.Payload, &pm)
+		if err != nil {
+			log.Errorln(err)
+		}
 
-			p, ok := roomPlayers[pm.PlayerName]
-			if !ok {
-				return
-			}
-
-			conn.WriteJSON(p)
+		err = conn.WriteJSON(pm)
+		if err != nil {
+			return
 		}
 	}
 }
