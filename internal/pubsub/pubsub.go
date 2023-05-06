@@ -3,6 +3,7 @@ package pubsub
 import (
 	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 )
 
 var messageQueue chan Message
@@ -75,7 +76,8 @@ func PublishInterface(topic string, data interface{}) error {
 	return nil
 }
 
-func Subscribe(topic string) <-chan Message {
+func Subscribe(topic string, sessionId string) <-chan Message {
+	log.Println("subscribe", topic, sessionId)
 	sub := make(chan Message, 1000)
 	if _, ok := subscribers[topic]; !ok {
 		subscribers[topic] = []chan Message{}

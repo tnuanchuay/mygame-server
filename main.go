@@ -13,7 +13,7 @@ func main() {
 
 	go func() {
 		for {
-			<-time.After(5 * time.Second)
+			<-time.After(1 * time.Second)
 			log.Println("players", room.GetAllPlayerName())
 			log.Println("listener count", pubsub.GetListenerCount())
 			log.Println(pubsub.GetAllSubscribers())
@@ -24,11 +24,11 @@ func main() {
 	app := fiber.New()
 
 	app.Use("/ws", UpgradeWebsocketMiddleware)
-
 	app.Get("/ws/session", websocket.New(PlayerSession))
 	app.Get("/ws/players", websocket.New(GetRoomPlayer))
 	app.Get("/ws/move", websocket.New(PlayerMovementHandler))
 	app.Get("/ws/player/:name", websocket.New(ListenPlayerMovement))
+
 	app.Get("/healthcheck", HealthCheckHandler)
 
 	app.Listen(":3000")

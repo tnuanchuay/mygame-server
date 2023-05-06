@@ -1,4 +1,4 @@
-package main
+package game
 
 type SessionMessage struct {
 	PlayerName string  `json:"playerName"`
@@ -11,10 +11,4 @@ type MovementMessage struct {
 	PlayerName string  `json:"playerName"`
 	X          float32 `json:"x"`
 	Y          float32 `json:"y"`
-}
-
-type WebSocketMessage struct {
-	Type    int
-	Message []byte
-	Error   error
 }

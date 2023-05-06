@@ -1,4 +1,4 @@
-package game_static
+package game
 
 import "fmt"
 

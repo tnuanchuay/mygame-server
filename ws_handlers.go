@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"github.com/gofiber/websocket/v2"
 	log "github.com/sirupsen/logrus"
-	"mygame-server/internal/game_static"
+	"mygame-server/internal/game"
 	"mygame-server/internal/pubsub"
 	"mygame-server/internal/room"
 	"time"
@@ -15,7 +15,7 @@ func PlayerSession(conn *websocket.Conn) {
 
 	playerName := ""
 	for {
-		var msg SessionMessage
+		var msg game.SessionMessage
 		err := conn.ReadJSON(&msg)
 		if err != nil {
 			log.Println(playerName, "has left the room")
@@ -52,7 +52,7 @@ func PlayerMovementHandler(conn *websocket.Conn) {
 	defer conn.Close()
 
 	for {
-		var msg MovementMessage
+		var msg game.MovementMessage
 		err := conn.ReadJSON(&msg)
 		if err != nil {
 			log.Errorln(err)
@@ -67,12 +67,10 @@ func PlayerMovementHandler(conn *websocket.Conn) {
 
 		room.UpdatePlayerPosition(pm)
 
-		err = pubsub.PublishInterface(game_static.TopicPlayerMove(pm.PlayerName), pm)
+		err = pubsub.PublishInterface(game.TopicPlayerMove(pm.PlayerName), pm)
 		if err != nil {
 			log.Errorln(err)
 		}
-
-		log.Println(pm.PlayerName, "is moving to", pm.X, pm.Y)
 	}
 
 }
@@ -81,11 +79,12 @@ func ListenPlayerMovement(conn *websocket.Conn) {
 	defer conn.Close()
 
 	name := conn.Params("name")
+	sessionId := conn.Params("sessionId")
 	if name == "" {
 		return
 	}
-
-	playerMovementChan := pubsub.Subscribe(game_static.TopicPlayerMove(name))
+	
+	playerMovementChan := pubsub.Subscribe(game.TopicPlayerMove(name), string(sessionId))
 
 	for {
 		msg := <-playerMovementChan
