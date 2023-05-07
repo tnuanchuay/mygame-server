@@ -68,15 +68,13 @@ func (ps *PubSub) GetListenerCount() int {
 	return sum
 }
 
-func (ps *PubSub) GetAllSubscribers() string {
+func (ps *PubSub) GetAllSubscribersLog() string {
 	ps.subscriberLocker.Lock()
 	defer ps.subscriberLocker.Unlock()
 
-	sum := ""
+	sum := "This is list of listeners"
 	for topic, subs := range ps.subscribers {
-		for range subs {
-			sum = fmt.Sprintf("%s\n%s", sum, topic)
-		}
+		sum = fmt.Sprintf("%s\nsize: %d\t%s", sum, len(subs), topic)
 	}
 
 	return sum
