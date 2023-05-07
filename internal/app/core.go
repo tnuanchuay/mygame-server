@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/websocket/v2"
 	log "github.com/sirupsen/logrus"
 	"mygame-server/internal/pubsub"
+	"mygame-server/internal/room"
 	"time"
 )
 
@@ -14,8 +15,8 @@ func InitApplicationLog() {
 	go func() {
 		for {
 			<-time.After(1 * time.Second)
-			//log.Println("players", room.GetAllPlayerName())
-			//log.Println("listener count", pubsub.Instance().GetListenerCount())
+			log.Println("players", room.GetAllPlayerName())
+			log.Println("listener count", pubsub.Instance().GetListenerCount())
 			log.Println(pubsub.Instance().GetAllSubscribersLog())
 		}
 	}()
