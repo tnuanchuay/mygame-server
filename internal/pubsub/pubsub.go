@@ -136,8 +136,9 @@ func (ps *PubSub) Unsubscribe(ch <-chan Message) {
 				if len(ps.subscribers[key]) == 1 {
 					delete(ps.subscribers, key)
 				} else {
-					ps.subscribers[key] = append(ps.subscribers[key][:i], ps.subscribers[key][i+1:]...)
+					ps.subscribers[key] = append(ps.subscribers[key][:j], ps.subscribers[key][j+1:]...)
 				}
+
 				close(sub)
 				return
 			}

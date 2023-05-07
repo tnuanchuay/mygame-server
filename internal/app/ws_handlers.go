@@ -45,7 +45,7 @@ func GetRoomPlayer(conn *websocket.Conn) {
 	conn.WriteJSON(room.GetPlayerList())
 	for {
 		conn.WriteJSON(room.GetPlayerList())
-		<-time.After(1000 * time.Millisecond)
+		<-time.After(1 * time.Second)
 	}
 }
 
@@ -86,7 +86,6 @@ func ListenPlayerMovement(conn *websocket.Conn) {
 
 	playerMovementChan := pubsub.Instance().Subscribe(game.TopicPlayerMove(name))
 	defer pubsub.Instance().Unsubscribe(playerMovementChan)
-
 	playerDisconnectedChan := pubsub.Instance().Subscribe(game.TopicPlayerDisconnected(name))
 	defer pubsub.Instance().Unsubscribe(playerDisconnectedChan)
 

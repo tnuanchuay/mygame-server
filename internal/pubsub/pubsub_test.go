@@ -5,7 +5,33 @@ import (
 	"testing"
 )
 
-func TestPubSub_UnsubscribeShouldRemoveCorrect(t *testing.T) {
+func TestPubSub_UnsubscribeShouldRemoveCorrectChannel2(t *testing.T) {
+	p := New(1)
+	ch1 := p.Subscribe("/1")
+	ch2 := p.Subscribe("/1")
+	ch3 := p.Subscribe("/1")
+
+	p.Unsubscribe(ch2)
+
+	if _, ok := <-ch2; ok {
+		t.Error("ch2 should be close")
+	}
+
+	if len(p.subscribers["/1"]) != 2 {
+		t.Error("subscriber /1 should have only 2")
+	}
+
+	if p.subscribers["/1"][0] != ch1 {
+		t.Error("first subscriber of /1 should be ch1")
+	}
+
+	if p.subscribers["/1"][1] != ch3 {
+		t.Error("first subscriber of /1 should be ch3")
+	}
+
+}
+
+func TestPubSub_UnsubscribeShouldRemoveCorrectChannel(t *testing.T) {
 	p := New(1)
 	ch1 := p.Subscribe("/1")
 	ch2 := p.Subscribe("/1")
