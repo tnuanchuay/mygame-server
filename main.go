@@ -15,12 +15,13 @@ func main() {
 		for {
 			<-time.After(1 * time.Second)
 			log.Println("players", room.GetAllPlayerName())
-			log.Println("listener count", pubsub.GetListenerCount())
-			log.Println(pubsub.GetAllSubscribers())
+			log.Println("listener count", pubsub.Instance().GetListenerCount())
+			log.Println(pubsub.Instance().GetAllSubscribers())
 		}
 	}()
 
 	pubsub.Init(1000)
+
 	app := fiber.New()
 
 	app.Use("/ws", UpgradeWebsocketMiddleware)

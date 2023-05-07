@@ -20,6 +20,7 @@ func PlayerSession(conn *websocket.Conn) {
 		if err != nil {
 			log.Println(playerName, "has left the room")
 			room.DeletePlayerByName(playerName)
+			pubsub.Instance().PublishInterface(game.TopicPlayerDisconnected(playerName), "")
 			return
 		}
 
@@ -67,7 +68,7 @@ func PlayerMovementHandler(conn *websocket.Conn) {
 
 		room.UpdatePlayerPosition(pm)
 
-		err = pubsub.PublishInterface(game.TopicPlayerMove(pm.PlayerName), pm)
+		err = pubsub.Instance().PublishInterface(game.TopicPlayerMove(pm.PlayerName), pm)
 		if err != nil {
 			log.Errorln(err)
 		}
@@ -79,23 +80,31 @@ func ListenPlayerMovement(conn *websocket.Conn) {
 	defer conn.Close()
 
 	name := conn.Params("name")
-	sessionId := conn.Params("sessionId")
 	if name == "" {
 		return
 	}
-	
-	playerMovementChan := pubsub.Subscribe(game.TopicPlayerMove(name), string(sessionId))
+
+	playerMovementChan := pubsub.Instance().Subscribe(game.TopicPlayerMove(name))
+	defer pubsub.Instance().Unsubscribe(playerMovementChan)
+
+	playerDisconnectedChan := pubsub.Instance().Subscribe(game.TopicPlayerDisconnected(name))
+	defer pubsub.Instance().Unsubscribe(playerDisconnectedChan)
 
 	for {
-		msg := <-playerMovementChan
-		var pm room.PlayerMovement
-		err := json.Unmarshal(msg.Payload, &pm)
-		if err != nil {
-			log.Errorln(err)
-		}
+		select {
+		case msg := <-playerMovementChan:
+			var pm room.PlayerMovement
+			err := json.Unmarshal(msg.Payload, &pm)
+			if err != nil {
+				log.Errorln(err)
+			}
 
-		err = conn.WriteJSON(pm)
-		if err != nil {
+			err = conn.WriteJSON(pm)
+			if err != nil {
+				return
+			}
+
+		case <-playerDisconnectedChan:
 			return
 		}
 	}

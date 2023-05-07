@@ -5,19 +5,6 @@ import (
 	"sync"
 )
 
-type Player struct {
-	PlayerName string  `json:"playerName"`
-	X          float32 `json:"x"`
-	Y          float32 `json:"y"`
-	ModelId    string  `json:"modelId"`
-}
-
-type PlayerMovement struct {
-	PlayerName string  `json:"playerName"`
-	X          float32 `json:"x"`
-	Y          float32 `json:"y"`
-}
-
 var roomPlayersLock = sync.Mutex{}
 var roomPlayers = make(map[string]Player)
 

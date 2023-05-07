@@ -4,46 +4,76 @@ import (
 	"encoding/json"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"sync"
 )
 
-var messageQueue chan Message
-var subscribers map[string][]chan Message
+type PubSub struct {
+	messageQueue     chan Message
+	subscriberLocker sync.Mutex
+	subscribers      map[string][]chan Message
+}
+
+var instance *PubSub
+
+func Instance() *PubSub {
+	return instance
+}
 
 func Init(bufferLength int) {
-	if messageQueue != nil {
+	if instance != nil {
 		return
 	}
 
-	messageQueue = make(chan Message, bufferLength)
-	subscribers = make(map[string][]chan Message)
+	instance = New(bufferLength)
 
+	instance.Run()
+}
+
+func New(bufferLength int) *PubSub {
+	return &PubSub{
+		messageQueue:     make(chan Message, bufferLength),
+		subscriberLocker: sync.Mutex{},
+		subscribers:      make(map[string][]chan Message),
+	}
+}
+
+func (ps *PubSub) Run() {
 	go func() {
 		for {
-			msg := <-messageQueue
+			msg, open := <-ps.messageQueue
+			if !open {
+				return
+			}
 
-			if _, ok := subscribers[msg.Topic]; !ok {
+			if _, ok := ps.subscribers[msg.Topic]; !ok {
 				continue
 			}
 
-			for _, listener := range subscribers[msg.Topic] {
+			for _, listener := range ps.subscribers[msg.Topic] {
 				listener <- msg
 			}
 		}
 	}()
 }
 
-func GetListenerCount() int {
+func (ps *PubSub) GetListenerCount() int {
+	ps.subscriberLocker.Lock()
+	defer ps.subscriberLocker.Unlock()
+
 	sum := 0
-	for _, v := range subscribers {
+	for _, v := range ps.subscribers {
 		sum = sum + len(v)
 	}
 
 	return sum
 }
 
-func GetAllSubscribers() string {
+func (ps *PubSub) GetAllSubscribers() string {
+	ps.subscriberLocker.Lock()
+	defer ps.subscriberLocker.Unlock()
+
 	sum := ""
-	for topic, subs := range subscribers {
+	for topic, subs := range ps.subscribers {
 		for range subs {
 			sum = fmt.Sprintf("%s\n%s", sum, topic)
 		}
@@ -52,16 +82,16 @@ func GetAllSubscribers() string {
 	return sum
 }
 
-func Publish(topic string, data []byte) {
+func (ps *PubSub) Publish(topic string, data []byte) {
 	msg := Message{
 		Topic:   topic,
 		Payload: data,
 	}
 
-	messageQueue <- msg
+	ps.messageQueue <- msg
 }
 
-func PublishInterface(topic string, data interface{}) error {
+func (ps *PubSub) PublishInterface(topic string, data interface{}) error {
 	b, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -72,22 +102,47 @@ func PublishInterface(topic string, data interface{}) error {
 		Payload: b,
 	}
 
-	messageQueue <- msg
+	ps.messageQueue <- msg
 	return nil
 }
 
-func Subscribe(topic string, sessionId string) <-chan Message {
-	log.Println("subscribe", topic, sessionId)
+func (ps *PubSub) Subscribe(topic string) <-chan Message {
+	ps.subscriberLocker.Lock()
+	defer ps.subscriberLocker.Unlock()
+
+	log.Println("subscribe", topic)
 	sub := make(chan Message, 1000)
-	if _, ok := subscribers[topic]; !ok {
-		subscribers[topic] = []chan Message{}
+	if _, ok := ps.subscribers[topic]; !ok {
+		ps.subscribers[topic] = []chan Message{}
 	}
 
-	subscribers[topic] = append(subscribers[topic], sub)
+	ps.subscribers[topic] = append(ps.subscribers[topic], sub)
 
 	return sub
 }
 
-func Unsubscribe(chan Message) {
+func (ps *PubSub) Unsubscribe(ch <-chan Message) {
+	ps.subscriberLocker.Lock()
+	defer ps.subscriberLocker.Unlock()
 
+	var keys []string
+	for key := range ps.subscribers {
+		keys = append(keys, key)
+	}
+
+	for i := 0; i < len(keys); i++ {
+		key := keys[i]
+		for j := 0; j < len(ps.subscribers[key]); j++ {
+			sub := ps.subscribers[key][j]
+			if sub == ch {
+				if len(ps.subscribers[key]) == 1 {
+					delete(ps.subscribers, key)
+				} else {
+					ps.subscribers[key] = append(ps.subscribers[key][:i], ps.subscribers[key][i+1:]...)
+				}
+				close(sub)
+				return
+			}
+		}
+	}
 }
